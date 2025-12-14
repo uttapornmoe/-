@@ -19,18 +19,16 @@
         .container { max-width: 600px; margin: 0 auto; }
         
         /* Dashboard */
-        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+        .dashboard { display: grid; grid-template-columns: 1fr; gap: 15px; margin-bottom: 25px; }
         .card { background: var(--card); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
-        .card.total { grid-column: span 2; background: var(--primary); color: white; }
+        .card.total { background: var(--primary); color: white; }
         
         /* กรอบสรุปหนี้ สีแดงตามธีมเงินยืม */
-        .card.debt-summary { grid-column: span 2; border: 2px solid var(--borrow); background-color: #FFF5F5; text-align: left;}
+        .card.debt-summary { border: 2px solid var(--borrow); background-color: #FFF5F5; text-align: left;}
         
         h2, h3, p { margin: 0; }
         .amount { font-size: 1.5rem; font-weight: bold; margin-top: 5px; }
-        .text-income { color: var(--income); }
-        .text-expense { color: var(--expense); }
-
+        
         /* Form */
         .form-box { background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative; margin-bottom: 25px;}
         input, select, button { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #EEE; border-radius: 12px; font-family: 'Kanit', sans-serif; font-size: 1rem; box-sizing: border-box; }
@@ -69,14 +67,6 @@
         <div class="card total">
             <h3>เงินคงเหลือสุทธิ (Cash)</h3>
             <p class="amount" id="netBalance">Loading...</p>
-        </div>
-        <div class="card">
-            <h3>เงินเข้า (รับ+ยืม)</h3>
-            <p class="amount text-income" id="totalIncome">0</p>
-        </div>
-        <div class="card">
-            <h3>เงินออก (จ่าย+คืน)</h3>
-            <p class="amount text-expense" id="totalExpense">0</p>
         </div>
         
         <div class="card debt-summary">
@@ -169,7 +159,7 @@
     function calculateDashboard(data) {
         let income = 0, expense = 0;
         data.forEach(item => {
-            // คำนวณเงินสดในมือตามจริง (รับ+ยืม = เข้า / จ่าย+คืน = ออก)
+            // คำนวณเงินสดในมือ (ยังต้องคำนวณอยู่เพื่อหายอดคงเหลือสุทธิ)
             if(item.type === 'รับเข้า' || item.type === 'เงินยืม') {
                 income += parseFloat(item.amount);
             }
@@ -177,8 +167,7 @@
                 expense += parseFloat(item.amount);
             }
         });
-        document.getElementById('totalIncome').innerText = income.toLocaleString();
-        document.getElementById('totalExpense').innerText = expense.toLocaleString();
+        // แสดงแค่ยอดคงเหลือสุทธิ
         document.getElementById('netBalance').innerText = (income - expense).toLocaleString() + ' บาท';
     }
 
@@ -224,7 +213,7 @@
         data.slice().reverse().slice(0, 10).forEach(item => {
             let color, badgeColor, sign;
             
-            // --- ปรับสีและเครื่องหมายตามคำขอ ---
+            // --- สีและเครื่องหมาย (History) ---
             if(item.type === 'รับเข้า') { 
                 color = 'var(--income)';    // เขียว
                 badgeColor = 'var(--income)'; 
