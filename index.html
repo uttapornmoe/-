@@ -10,8 +10,8 @@
             --primary: #6C63FF; 
             --income: #00C9A7;  /* เขียว (รับเข้า) */
             --expense: #FF8066; /* ส้ม (จ่ายออก) */
-            --borrow: #FF4757;  /* แดงเข้ม (เงินยืม) */
-            --repay: #1E90FF;   /* ฟ้า (ส่งใช้เงินยืม) */
+            --borrow: #FF4757;  /* แดง (เงินยืม/ให้ยืม) */
+            --repay: #1E90FF;   /* ฟ้า (ส่งใช้เงินยืม/ได้คืน) */
             --bg: #F3F4F6;
             --card: #FFFFFF;
         }
@@ -23,7 +23,7 @@
         .card { background: var(--card); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
         .card.total { background: var(--primary); color: white; }
         
-        /* กรอบสรุปหนี้ สีแดงตามธีมเงินยืม */
+        /* กรอบสรุปหนี้ */
         .card.debt-summary { border: 2px solid var(--borrow); background-color: #FFF5F5; text-align: left;}
         
         h2, h3, p { margin: 0; }
@@ -65,7 +65,7 @@
 
     <div class="dashboard">
         <div class="card total">
-            <h3>เงินคงเหลือสุทธิ (Cash)</h3>
+            <h3>💵 เงินสดในมือ (Net Cash)</h3>
             <p class="amount" id="netBalance">Loading...</p>
         </div>
         
@@ -84,8 +84,8 @@
             <select id="type" required>
                 <option value="รับเข้า">📥 รับเข้า (Income)</option>
                 <option value="จ่ายออก">📤 จ่ายออก (Expense)</option>
-                <option value="เงินยืม">🤝 เงินยืม (Borrow)</option>
-                <option value="ส่งใช้เงินยืม">💸 ส่งคืนเงินยืม (Repay)</option>
+                <option value="เงินยืม">🤝 เงินยืม (ให้เขายืม)</option>
+                <option value="ส่งใช้เงินยืม">💸 ส่งใช้เงินยืม (ได้คืน)</option>
             </select>
             <input type="text" id="person" placeholder="ชื่อคน (รับจาก/จ่ายให้)" required>
             <input type="number" id="amount" placeholder="จำนวนเงิน" required>
@@ -157,18 +157,26 @@
     }
 
     function calculateDashboard(data) {
-        let income = 0, expense = 0;
+        let currentCash = 0;
+        
         data.forEach(item => {
-            // คำนวณเงินสดในมือ (ยังต้องคำนวณอยู่เพื่อหายอดคงเหลือสุทธิ)
-            if(item.type === 'รับเข้า' || item.type === 'เงินยืม') {
-                income += parseFloat(item.amount);
+            const amount = parseFloat(item.amount);
+            
+            // สูตรคำนวณเงินสดในมือ:
+            // 1. รับเข้า = เงินเพิ่ม (+)
+            // 2. จ่ายออก = เงินลด (-)
+            // 3. เงินยืม (ให้เขาไป) = เงินลด (-)
+            // 4. ส่งใช้เงินยืม (ได้คืนมา) = เงินเพิ่ม (+)
+
+            if(item.type === 'รับเข้า' || item.type === 'ส่งใช้เงินยืม') {
+                currentCash += amount;
             }
-            else if(item.type === 'จ่ายออก' || item.type === 'ส่งใช้เงินยืม') {
-                expense += parseFloat(item.amount);
+            else if(item.type === 'จ่ายออก' || item.type === 'เงินยืม') {
+                currentCash -= amount;
             }
         });
-        // แสดงแค่ยอดคงเหลือสุทธิ
-        document.getElementById('netBalance').innerText = (income - expense).toLocaleString() + ' บาท';
+        
+        document.getElementById('netBalance').innerText = currentCash.toLocaleString() + ' บาท';
     }
 
     function renderDebtors(data) {
@@ -179,9 +187,9 @@
             if (!debtMap[item.person]) debtMap[item.person] = 0;
 
             if (item.type === 'เงินยืม') {
-                debtMap[item.person] += amount; 
+                debtMap[item.person] += amount; // ยืมไป หนี้เพิ่ม
             } else if (item.type === 'ส่งใช้เงินยืม') {
-                debtMap[item.person] -= amount; 
+                debtMap[item.person] -= amount; // คืนมา หนี้ลด
             }
         });
 
@@ -213,26 +221,26 @@
         data.slice().reverse().slice(0, 10).forEach(item => {
             let color, badgeColor, sign;
             
-            // --- สีและเครื่องหมาย (History) ---
+            // แสดงผลตามที่ขอ:
             if(item.type === 'รับเข้า') { 
-                color = 'var(--income)';    // เขียว
+                color = 'var(--income)';    
                 badgeColor = 'var(--income)'; 
-                sign = '+'; 
+                sign = '+'; // เงินเข้า
             }
             else if(item.type === 'จ่ายออก') { 
-                color = 'var(--expense)';   // ส้ม
+                color = 'var(--expense)';   
                 badgeColor = 'var(--expense)'; 
-                sign = '-'; 
+                sign = '-'; // เงินออก
             }
             else if(item.type === 'เงินยืม') { 
                 color = 'var(--borrow)';    // แดง
                 badgeColor = 'var(--borrow)'; 
-                sign = '-'; 
+                sign = '-'; // เงินออก (ให้ยืม)
             }
             else if(item.type === 'ส่งใช้เงินยืม') { 
                 color = 'var(--repay)';     // ฟ้า
                 badgeColor = 'var(--repay)'; 
-                sign = '+'; 
+                sign = '+'; // เงินเข้า (ได้คืน)
             }
 
             const div = document.createElement('div');
