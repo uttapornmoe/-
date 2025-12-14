@@ -8,10 +8,10 @@
     <style>
         :root {
             --primary: #6C63FF; 
-            --income: #00C9A7;  
-            --expense: #FF8066; 
-            --borrow: #4D96FF;  
-            --repay: #9D4EDD;   
+            --income: #00C9A7;  /* เขียว (รับเข้า) */
+            --expense: #FF8066; /* ส้ม (จ่ายออก) */
+            --borrow: #FF4757;  /* แดงเข้ม (เงินยืม) */
+            --repay: #1E90FF;   /* ฟ้า (ส่งใช้เงินยืม) */
             --bg: #F3F4F6;
             --card: #FFFFFF;
         }
@@ -22,7 +22,9 @@
         .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
         .card { background: var(--card); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
         .card.total { grid-column: span 2; background: var(--primary); color: white; }
-        .card.debt-summary { grid-column: span 2; border: 2px solid var(--borrow); background-color: #F0F7FF; text-align: left;}
+        
+        /* กรอบสรุปหนี้ สีแดงตามธีมเงินยืม */
+        .card.debt-summary { grid-column: span 2; border: 2px solid var(--borrow); background-color: #FFF5F5; text-align: left;}
         
         h2, h3, p { margin: 0; }
         .amount { font-size: 1.5rem; font-weight: bold; margin-top: 5px; }
@@ -65,20 +67,20 @@
 
     <div class="dashboard">
         <div class="card total">
-            <h3>เงินคงเหลือสุทธิ</h3>
+            <h3>เงินคงเหลือสุทธิ (Cash)</h3>
             <p class="amount" id="netBalance">Loading...</p>
         </div>
         <div class="card">
-            <h3>เงินเข้า (รับ+คืน)</h3>
+            <h3>เงินเข้า (รับ+ยืม)</h3>
             <p class="amount text-income" id="totalIncome">0</p>
         </div>
         <div class="card">
-            <h3>เงินออก (จ่าย+ให้ยืม)</h3>
+            <h3>เงินออก (จ่าย+คืน)</h3>
             <p class="amount text-expense" id="totalExpense">0</p>
         </div>
         
         <div class="card debt-summary">
-            <h3 style="color: var(--borrow);">📉 รายชื่อลูกหนี้ (คงค้าง)</h3>
+            <h3 style="color: var(--borrow);">📉 รายชื่อลูกหนี้ (ค้างจ่ายเรา)</h3>
             <div id="debtList" style="margin-top: 15px;">
                 <p style="color: gray; text-align: center;">ไม่มีหนี้ค้างชำระ 🎉</p>
             </div>
@@ -90,8 +92,8 @@
         <form id="accountForm">
             <input type="hidden" id="editRow">
             <select id="type" required>
-                <option value="รับเข้า">📥 รับเข้า (Received)</option>
-                <option value="จ่ายออก">📤 จ่ายออก (Paid)</option>
+                <option value="รับเข้า">📥 รับเข้า (Income)</option>
+                <option value="จ่ายออก">📤 จ่ายออก (Expense)</option>
                 <option value="เงินยืม">🤝 เงินยืม (Borrow)</option>
                 <option value="ส่งใช้เงินยืม">💸 ส่งคืนเงินยืม (Repay)</option>
             </select>
@@ -157,7 +159,7 @@
                 if(response.result === 'success') {
                     allData = response.data;
                     calculateDashboard(allData);
-                    renderDebtors(allData); // เพิ่มฟังก์ชันคำนวณหนี้
+                    renderDebtors(allData);
                     renderHistory(allData);
                 }
             })
@@ -167,6 +169,7 @@
     function calculateDashboard(data) {
         let income = 0, expense = 0;
         data.forEach(item => {
+            // คำนวณเงินสดในมือตามจริง (รับ+ยืม = เข้า / จ่าย+คืน = ออก)
             if(item.type === 'รับเข้า' || item.type === 'เงินยืม') {
                 income += parseFloat(item.amount);
             }
@@ -179,19 +182,17 @@
         document.getElementById('netBalance').innerText = (income - expense).toLocaleString() + ' บาท';
     }
 
-    // ฟังก์ชันใหม่: คำนวณและแสดงรายชื่อเจ้าหนี้ (ยอดคงค้าง)
     function renderDebtors(data) {
         const debtMap = {};
 
-        // วนลูปคำนวณยอดรวมรายคน
         data.forEach(item => {
             const amount = parseFloat(item.amount);
             if (!debtMap[item.person]) debtMap[item.person] = 0;
 
             if (item.type === 'เงินยืม') {
-                debtMap[item.person] += amount; // ยืมมาเพิ่มหนี้
+                debtMap[item.person] += amount; 
             } else if (item.type === 'ส่งใช้เงินยืม') {
-                debtMap[item.person] -= amount; // คืนไปลดหนี้
+                debtMap[item.person] -= amount; 
             }
         });
 
@@ -199,7 +200,6 @@
         debtListDiv.innerHTML = '';
         let hasDebt = false;
 
-        // วนลูปแสดงผลเฉพาะคนที่มีหนี้เหลือ (> 0)
         for (const [person, amount] of Object.entries(debtMap)) {
             if (amount > 0) {
                 hasDebt = true;
@@ -223,10 +223,28 @@
         list.innerHTML = '';
         data.slice().reverse().slice(0, 10).forEach(item => {
             let color, badgeColor, sign;
-            if(item.type === 'รับเข้า') { color = 'var(--income)'; badgeColor = 'var(--income)'; sign = '+'; }
-            else if(item.type === 'จ่ายออก') { color = 'var(--expense)'; badgeColor = 'var(--expense)'; sign = '-'; }
-            else if(item.type === 'เงินยืม') { color = 'var(--borrow)'; badgeColor = 'var(--borrow)'; sign = '+'; }
-            else { color = 'var(--repay)'; badgeColor = 'var(--repay)'; sign = '-'; }
+            
+            // --- ปรับสีและเครื่องหมายตามคำขอ ---
+            if(item.type === 'รับเข้า') { 
+                color = 'var(--income)';    // เขียว
+                badgeColor = 'var(--income)'; 
+                sign = '+'; 
+            }
+            else if(item.type === 'จ่ายออก') { 
+                color = 'var(--expense)';   // ส้ม
+                badgeColor = 'var(--expense)'; 
+                sign = '-'; 
+            }
+            else if(item.type === 'เงินยืม') { 
+                color = 'var(--borrow)';    // แดง
+                badgeColor = 'var(--borrow)'; 
+                sign = '-'; 
+            }
+            else if(item.type === 'ส่งใช้เงินยืม') { 
+                color = 'var(--repay)';     // ฟ้า
+                badgeColor = 'var(--repay)'; 
+                sign = '+'; 
+            }
 
             const div = document.createElement('div');
             div.className = 'history-item';
