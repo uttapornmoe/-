@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบบัญชีเบิก-จ่าย</title>
+    <title>ระบบบัญชีและการยืม</title>
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --primary: #6C63FF; 
-            --income: #00C9A7;  /* เขียว */
-            --expense: #FF8066; /* ส้ม */
-            --borrow: #4D96FF;  /* ฟ้า (เงินยืม) */
-            --repay: #9D4EDD;   /* ม่วง (คืนเงิน) */
+            --income: #00C9A7;  
+            --expense: #FF8066; 
+            --borrow: #4D96FF;  
+            --repay: #9D4EDD;   
             --bg: #F3F4F6;
             --card: #FFFFFF;
         }
@@ -22,31 +22,37 @@
         .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
         .card { background: var(--card); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); text-align: center; }
         .card.total { grid-column: span 2; background: var(--primary); color: white; }
+        .card.debt-summary { grid-column: span 2; border: 2px solid var(--borrow); background-color: #F0F7FF; text-align: left;}
+        
         h2, h3, p { margin: 0; }
         .amount { font-size: 1.5rem; font-weight: bold; margin-top: 5px; }
         .text-income { color: var(--income); }
         .text-expense { color: var(--expense); }
 
         /* Form */
-        .form-box { background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative; }
+        .form-box { background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); position: relative; margin-bottom: 25px;}
         input, select, button { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid #EEE; border-radius: 12px; font-family: 'Kanit', sans-serif; font-size: 1rem; box-sizing: border-box; }
         input:focus, select:focus { outline: none; border-color: var(--primary); }
         button { background-color: var(--primary); color: white; border: none; cursor: pointer; font-weight: bold; transition: 0.3s; }
         button:hover { opacity: 0.9; transform: translateY(-2px); }
         button.cancel { background-color: #999; margin-top: -10px; display: none; }
 
-        /* History List */
-        .history { margin-top: 30px; }
+        /* Lists */
+        .list-section { margin-top: 20px; }
         .history-item { background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        
+        /* Debt List specific */
+        .debt-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #ddd; }
+        .debt-item:last-child { border-bottom: none; }
+        .debt-name { font-weight: bold; font-size: 1.1rem; }
+        .debt-amount { color: var(--borrow); font-weight: bold; font-size: 1.2rem; }
+
         .actions { display: flex; gap: 8px; }
         .btn-icon { width: 30px; height: 30px; padding: 0; margin: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
         .btn-edit { background-color: #FFC107; color: #333; }
         .btn-del { background-color: #FF4757; color: white; }
-
-        /* Status Badges */
         .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: white; margin-bottom: 5px; }
 
-        /* Loading Overlay */
         #loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 99; text-align: center; padding-top: 200px; font-weight: bold; color: var(--primary); }
     </style>
 </head>
@@ -70,6 +76,13 @@
             <h3>เงินออก (จ่าย+คืน)</h3>
             <p class="amount text-expense" id="totalExpense">0</p>
         </div>
+        
+        <div class="card debt-summary">
+            <h3 style="color: var(--borrow);">📉 สรุปยอดหนี้ที่ต้องคืน (แยกรายคน)</h3>
+            <div id="debtList" style="margin-top: 15px;">
+                <p style="color: gray; text-align: center;">ไม่มีหนี้ค้างชำระ 🎉</p>
+            </div>
+        </div>
     </div>
 
     <div class="form-box">
@@ -79,8 +92,8 @@
             <select id="type" required>
                 <option value="รายรับ">📥 รายรับ (Received)</option>
                 <option value="รายจ่าย">📤 รายจ่าย (Paid)</option>
-                <option value="เงินยืม">🤝 เงินยืม (Borrow)</option>
-                <option value="ส่งใช้เงินยืม">💸 ส่งใช้เงินยืม (Repay)</option>
+                <option value="เงินยืม">🤝 เงินยืมมา (Borrow)</option>
+                <option value="ส่งใช้เงินยืม">💸 ส่งคืนเงินยืม (Repay)</option>
             </select>
             <input type="text" id="person" placeholder="ชื่อคน (รับจาก/จ่ายให้)" required>
             <input type="number" id="amount" placeholder="จำนวนเงิน" required>
@@ -90,7 +103,7 @@
         </form>
     </div>
 
-    <div class="history">
+    <div class="list-section">
         <h3>รายการล่าสุด</h3>
         <div id="historyList"></div>
     </div>
@@ -98,7 +111,6 @@
 
 <script>
     // ************************************************
-    // URL Web App ของคุณ
     const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyU1ZxpJJQ2NOra5gS7NWHzgS5HGvreOEmnFSgG4J0EVTTs73mmzDpkHP5rOXakdj1laQ/exec'; 
     // ************************************************
 
@@ -145,23 +157,19 @@
                 if(response.result === 'success') {
                     allData = response.data;
                     calculateDashboard(allData);
+                    renderDebtors(allData); // เพิ่มฟังก์ชันคำนวณหนี้
                     renderHistory(allData);
                 }
             })
-            .catch(err => {
-                document.getElementById('netBalance').innerText = 'Error';
-                console.error(err);
-            });
+            .catch(err => console.error(err));
     }
 
     function calculateDashboard(data) {
         let income = 0, expense = 0;
         data.forEach(item => {
-            // กลุ่มเงินเข้า: รายรับ + เงินยืม
             if(item.type === 'รายรับ' || item.type === 'เงินยืม') {
                 income += parseFloat(item.amount);
             }
-            // กลุ่มเงินออก: รายจ่าย + ส่งใช้เงินยืม
             else if(item.type === 'รายจ่าย' || item.type === 'ส่งใช้เงินยืม') {
                 expense += parseFloat(item.amount);
             }
@@ -171,18 +179,54 @@
         document.getElementById('netBalance').innerText = (income - expense).toLocaleString() + ' บาท';
     }
 
+    // ฟังก์ชันใหม่: คำนวณและแสดงรายชื่อเจ้าหนี้ (ยอดคงค้าง)
+    function renderDebtors(data) {
+        const debtMap = {};
+
+        // วนลูปคำนวณยอดรวมรายคน
+        data.forEach(item => {
+            const amount = parseFloat(item.amount);
+            if (!debtMap[item.person]) debtMap[item.person] = 0;
+
+            if (item.type === 'เงินยืม') {
+                debtMap[item.person] += amount; // ยืมมาเพิ่มหนี้
+            } else if (item.type === 'ส่งใช้เงินยืม') {
+                debtMap[item.person] -= amount; // คืนไปลดหนี้
+            }
+        });
+
+        const debtListDiv = document.getElementById('debtList');
+        debtListDiv.innerHTML = '';
+        let hasDebt = false;
+
+        // วนลูปแสดงผลเฉพาะคนที่มีหนี้เหลือ (> 0)
+        for (const [person, amount] of Object.entries(debtMap)) {
+            if (amount > 0) {
+                hasDebt = true;
+                const div = document.createElement('div');
+                div.className = 'debt-item';
+                div.innerHTML = `
+                    <span class="debt-name">👤 ${person}</span>
+                    <span class="debt-amount">ค้าง ${amount.toLocaleString()} บ.</span>
+                `;
+                debtListDiv.appendChild(div);
+            }
+        }
+
+        if (!hasDebt) {
+            debtListDiv.innerHTML = '<p style="color: gray; text-align: center;">ไม่มีหนี้ค้างชำระ 🎉</p>';
+        }
+    }
+
     function renderHistory(data) {
         const list = document.getElementById('historyList');
         list.innerHTML = '';
-        
-        // แสดง 10 รายการล่าสุด
         data.slice().reverse().slice(0, 10).forEach(item => {
             let color, badgeColor, sign;
-            
             if(item.type === 'รายรับ') { color = 'var(--income)'; badgeColor = 'var(--income)'; sign = '+'; }
             else if(item.type === 'รายจ่าย') { color = 'var(--expense)'; badgeColor = 'var(--expense)'; sign = '-'; }
             else if(item.type === 'เงินยืม') { color = 'var(--borrow)'; badgeColor = 'var(--borrow)'; sign = '+'; }
-            else { color = 'var(--repay)'; badgeColor = 'var(--repay)'; sign = '-'; } // ส่งใช้เงินยืม
+            else { color = 'var(--repay)'; badgeColor = 'var(--repay)'; sign = '-'; }
 
             const div = document.createElement('div');
             div.className = 'history-item';
