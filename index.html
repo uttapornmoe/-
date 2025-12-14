@@ -90,8 +90,8 @@
         <form id="accountForm">
             <input type="hidden" id="editRow">
             <select id="type" required>
-                <option value="รายรับ">📥 รายรับ (Received)</option>
-                <option value="รายจ่าย">📤 รายจ่าย (Paid)</option>
+                <option value="รับเข้า">📥 รับเข้า (Received)</option>
+                <option value="จ่ายออก">📤 จ่ายออก (Paid)</option>
                 <option value="เงินยืม">🤝 เงินยืม (Borrow)</option>
                 <option value="ส่งใช้เงินยืม">💸 ส่งคืนเงินยืม (Repay)</option>
             </select>
@@ -167,10 +167,10 @@
     function calculateDashboard(data) {
         let income = 0, expense = 0;
         data.forEach(item => {
-            if(item.type === 'รายรับ' || item.type === 'เงินยืม') {
+            if(item.type === 'รับเข้า' || item.type === 'เงินยืม') {
                 income += parseFloat(item.amount);
             }
-            else if(item.type === 'รายจ่าย' || item.type === 'ส่งใช้เงินยืม') {
+            else if(item.type === 'จ่ายออก' || item.type === 'ส่งใช้เงินยืม') {
                 expense += parseFloat(item.amount);
             }
         });
@@ -223,8 +223,8 @@
         list.innerHTML = '';
         data.slice().reverse().slice(0, 10).forEach(item => {
             let color, badgeColor, sign;
-            if(item.type === 'รายรับ') { color = 'var(--income)'; badgeColor = 'var(--income)'; sign = '+'; }
-            else if(item.type === 'รายจ่าย') { color = 'var(--expense)'; badgeColor = 'var(--expense)'; sign = '-'; }
+            if(item.type === 'รับเข้า') { color = 'var(--income)'; badgeColor = 'var(--income)'; sign = '+'; }
+            else if(item.type === 'จ่ายออก') { color = 'var(--expense)'; badgeColor = 'var(--expense)'; sign = '-'; }
             else if(item.type === 'เงินยืม') { color = 'var(--borrow)'; badgeColor = 'var(--borrow)'; sign = '+'; }
             else { color = 'var(--repay)'; badgeColor = 'var(--repay)'; sign = '-'; }
 
