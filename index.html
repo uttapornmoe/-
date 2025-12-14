@@ -37,4 +37,215 @@
 
         /* History List */
         .history { margin-top: 30px; }
-        .history-item { background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;
+        .history-item { background: white; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.03); }
+        .actions { display: flex; gap: 8px; }
+        .btn-icon { width: 30px; height: 30px; padding: 0; margin: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+        .btn-edit { background-color: #FFC107; color: #333; }
+        .btn-del { background-color: #FF4757; color: white; }
+
+        /* Status Badges */
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; color: white; margin-bottom: 5px; }
+
+        /* Loading Overlay */
+        #loading { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); z-index: 99; text-align: center; padding-top: 200px; font-weight: bold; color: var(--primary); }
+    </style>
+</head>
+<body>
+
+<div id="loading">กำลังประมวลผล...</div>
+
+<div class="container">
+    <h2 style="text-align: center; margin-bottom: 20px;">💰 ระบบบัญชีและการยืม</h2>
+
+    <div class="dashboard">
+        <div class="card total">
+            <h3>เงินคงเหลือสุทธิ</h3>
+            <p class="amount" id="netBalance">Loading...</p>
+        </div>
+        <div class="card">
+            <h3>เงินเข้า (รับ+ยืม)</h3>
+            <p class="amount text-income" id="totalIncome">0</p>
+        </div>
+        <div class="card">
+            <h3>เงินออก (จ่าย+คืน)</h3>
+            <p class="amount text-expense" id="totalExpense">0</p>
+        </div>
+    </div>
+
+    <div class="form-box">
+        <h3 id="formTitle" style="margin-bottom: 15px;">ลงรายการใหม่</h3>
+        <form id="accountForm">
+            <input type="hidden" id="editRow">
+            <select id="type" required>
+                <option value="รายรับ">📥 รายรับ (Received)</option>
+                <option value="รายจ่าย">📤 รายจ่าย (Paid)</option>
+                <option value="เงินยืม">🤝 เงินยืม (Borrow)</option>
+                <option value="ส่งใช้เงินยืม">💸 ส่งใช้เงินยืม (Repay)</option>
+            </select>
+            <input type="text" id="person" placeholder="ชื่อคน (รับจาก/จ่ายให้)" required>
+            <input type="number" id="amount" placeholder="จำนวนเงิน" required>
+            <input type="text" id="note" placeholder="หมายเหตุ (ถ้ามี)">
+            <button type="submit" id="submitBtn">บันทึกรายการ</button>
+            <button type="button" id="cancelBtn" class="cancel" onclick="cancelEdit()">ยกเลิกการแก้ไข</button>
+        </form>
+    </div>
+
+    <div class="history">
+        <h3>รายการล่าสุด</h3>
+        <div id="historyList"></div>
+    </div>
+</div>
+
+<script>
+    // ************************************************
+    // URL Web App ของคุณ
+    const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyU1ZxpJJQ2NOra5gS7NWHzgS5HGvreOEmnFSgG4J0EVTTs73mmzDpkHP5rOXakdj1laQ/exec'; 
+    // ************************************************
+
+    const form = document.getElementById('accountForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const loading = document.getElementById('loading');
+    let allData = [];
+
+    window.onload = fetchData;
+
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        const editRow = document.getElementById('editRow').value;
+        const action = editRow ? 'edit' : 'add';
+        
+        const data = new FormData();
+        data.append('action', action);
+        if(editRow) data.append('row', editRow);
+        
+        data.append('type', document.getElementById('type').value);
+        data.append('person', document.getElementById('person').value);
+        data.append('amount', document.getElementById('amount').value);
+        data.append('note', document.getElementById('note').value);
+
+        loading.style.display = 'block';
+
+        fetch(WEB_APP_URL, { method: 'POST', body: data })
+            .then(res => res.json())
+            .then(result => {
+                alert(editRow ? 'แก้ไขเรียบร้อย!' : 'บันทึกเรียบร้อย!');
+                cancelEdit();
+                fetchData();
+            })
+            .catch(err => alert('เกิดข้อผิดพลาด: ' + err))
+            .finally(() => loading.style.display = 'none');
+    });
+
+    function fetchData() {
+        document.getElementById('netBalance').innerText = 'Loading...';
+        fetch(WEB_APP_URL)
+            .then(res => res.json())
+            .then(response => {
+                if(response.result === 'success') {
+                    allData = response.data;
+                    calculateDashboard(allData);
+                    renderHistory(allData);
+                }
+            })
+            .catch(err => {
+                document.getElementById('netBalance').innerText = 'Error';
+                console.error(err);
+            });
+    }
+
+    function calculateDashboard(data) {
+        let income = 0, expense = 0;
+        data.forEach(item => {
+            // กลุ่มเงินเข้า: รายรับ + เงินยืม
+            if(item.type === 'รายรับ' || item.type === 'เงินยืม') {
+                income += parseFloat(item.amount);
+            }
+            // กลุ่มเงินออก: รายจ่าย + ส่งใช้เงินยืม
+            else if(item.type === 'รายจ่าย' || item.type === 'ส่งใช้เงินยืม') {
+                expense += parseFloat(item.amount);
+            }
+        });
+        document.getElementById('totalIncome').innerText = income.toLocaleString();
+        document.getElementById('totalExpense').innerText = expense.toLocaleString();
+        document.getElementById('netBalance').innerText = (income - expense).toLocaleString() + ' บาท';
+    }
+
+    function renderHistory(data) {
+        const list = document.getElementById('historyList');
+        list.innerHTML = '';
+        
+        // แสดง 10 รายการล่าสุด
+        data.slice().reverse().slice(0, 10).forEach(item => {
+            let color, badgeColor, sign;
+            
+            if(item.type === 'รายรับ') { color = 'var(--income)'; badgeColor = 'var(--income)'; sign = '+'; }
+            else if(item.type === 'รายจ่าย') { color = 'var(--expense)'; badgeColor = 'var(--expense)'; sign = '-'; }
+            else if(item.type === 'เงินยืม') { color = 'var(--borrow)'; badgeColor = 'var(--borrow)'; sign = '+'; }
+            else { color = 'var(--repay)'; badgeColor = 'var(--repay)'; sign = '-'; } // ส่งใช้เงินยืม
+
+            const div = document.createElement('div');
+            div.className = 'history-item';
+            div.innerHTML = `
+                <div>
+                    <span class="badge" style="background-color: ${badgeColor}">${item.type}</span>
+                    <strong>${item.person}</strong> <br>
+                    <small style="color: gray">${item.note} (${new Date(item.timestamp).toLocaleDateString()})</small>
+                </div>
+                <div class="actions" style="align-items: center;">
+                    <div style="color: ${color}; font-weight: bold; margin-right: 10px;">
+                        ${sign} ${parseFloat(item.amount).toLocaleString()}
+                    </div>
+                    <button class="btn-icon btn-edit" onclick="startEdit(${item.row})">✏️</button>
+                    <button class="btn-icon btn-del" onclick="deleteItem(${item.row})">🗑️</button>
+                </div>
+            `;
+            list.appendChild(div);
+        });
+    }
+
+    window.startEdit = function(row) {
+        const item = allData.find(d => d.row === row);
+        if(!item) return;
+        document.getElementById('editRow').value = item.row;
+        document.getElementById('type').value = item.type;
+        document.getElementById('person').value = item.person;
+        document.getElementById('amount').value = item.amount;
+        document.getElementById('note').value = item.note;
+        document.getElementById('formTitle').innerText = '✏️ แก้ไขรายการ (แถว ' + row + ')';
+        submitBtn.innerText = 'อัปเดตข้อมูล';
+        submitBtn.style.backgroundColor = '#FFC107';
+        submitBtn.style.color = '#333';
+        cancelBtn.style.display = 'block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    window.cancelEdit = function() {
+        form.reset();
+        document.getElementById('editRow').value = '';
+        document.getElementById('formTitle').innerText = 'ลงรายการใหม่';
+        submitBtn.innerText = 'บันทึกรายการ';
+        submitBtn.style.backgroundColor = '';
+        submitBtn.style.color = 'white';
+        cancelBtn.style.display = 'none';
+    }
+
+    window.deleteItem = function(row) {
+        if(!confirm('ยืนยันที่จะลบรายการนี้?')) return;
+        loading.style.display = 'block';
+        const data = new FormData();
+        data.append('action', 'delete');
+        data.append('row', row);
+        fetch(WEB_APP_URL, { method: 'POST', body: data })
+            .then(res => res.json())
+            .then(result => {
+                alert('ลบเรียบร้อย!');
+                fetchData();
+            })
+            .catch(err => alert('Error: ' + err))
+            .finally(() => loading.style.display = 'none');
+    }
+</script>
+
+</body>
+</html>
